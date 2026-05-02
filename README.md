@@ -36,6 +36,35 @@ A tiny Node.js Express app to test database connections from the browser.
    http://localhost:3000
    ```
 
+## Docker
+
+Build the Docker image:
+
+```bash
+docker build -t db-connection-tester .
+```
+
+Run the container with environment variables:
+
+```bash
+docker run -p 3000:3000 \
+  -e DB_URL="your_connection_string" \
+  -e DB_TYPE="postgres" \
+  db-connection-tester
+```
+
+Or use a local env file:
+
+```bash
+docker run -p 3000:3000 --env-file .env db-connection-tester
+```
+
+Then open the browser at:
+
+```text
+http://localhost:3000
+```
+
 ## Environment variables
 
 - `DB_URL` - connection string for the database
