@@ -1,0 +1,17 @@
+{
+  "name": "db-connection-tester",
+  "version": "1.0.0",
+  "description": "Simple database connection tester with browser UI and environment-configured connection string.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "mongodb": "^6.12.1",
+    "mysql2": "^3.5.4",
+    "redis": "^5.12.1",
+    "pg": "^8.11.2"
+  }
+}

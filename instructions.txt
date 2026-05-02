@@ -1,0 +1,37 @@
+Supported database types and notes
+
+Supported:
+- postgres / postgresql
+- mysql / mariadb
+- mongodb
+- redis
+
+Connection string examples:
+- PostgreSQL: postgres://user:pass@localhost:5432/dbname
+- MySQL: mysql://user:pass@localhost:3306/dbname
+- MongoDB: mongodb://user:pass@localhost:27017/dbname or mongodb+srv://user:pass@cluster0.example.com/dbname
+- Redis: redis://localhost:6379 or rediss://user:pass@host:6379
+
+Special setup notes:
+- PostgreSQL / MySQL
+  - Ensure the database exists and the user can connect.
+  - If connecting to a remote host, make sure the server accepts remote connections and the firewall/port is open.
+
+- MongoDB
+  - For local MongoDB, ensure `bindIp` includes the host address or use `localhost`.
+  - For Atlas or cloud MongoDB, use the provided `mongodb+srv://` string or `mongodb://` with correct credentials and network access.
+  - If using authentication, include username/password in the URI.
+
+- Redis
+  - For TLS/SSL, use `rediss://`.
+  - If Redis requires a password, include it in the URI: `redis://:password@host:port`.
+  - If you are testing a local Redis instance, make sure the server is running and reachable.
+
+How to use:
+1. Install dependencies: `npm install`
+2. Copy `.env.example` to `.env`
+3. Set `DB_URL` and optionally `DB_TYPE` in `.env`
+4. Start the app: `npm start`
+5. Open `http://localhost:3000`
+
+If the app cannot infer the type from the URI, set `DB_TYPE` explicitly.

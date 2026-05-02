@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DB Connection Tester</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 0;
+        padding: 0;
+        background: #f5f7fb;
+        color: #111827;
+      }
+      .page {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+      h1 {
+        margin-bottom: 8px;
+      }
+      .card {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 24px 80px rgba(15, 23, 42, 0.08);
+        padding: 24px;
+        margin-bottom: 20px;
+      }
+      label {
+        display: block;
+        margin-top: 16px;
+        font-weight: 600;
+      }
+      input,
+      select,
+      button,
+      textarea {
+        width: 100%;
+        border: 1px solid #d1d5db;
+        border-radius: 12px;
+        padding: 10px 14px;
+        font-size: 1rem;
+      }
+      button {
+        background: #3b82f6;
+        border: none;
+        color: white;
+        cursor: pointer;
+        margin-top: 20px;
+      }
+      button:hover {
+        background: #2563eb;
+      }
+      .output {
+        margin-top: 18px;
+        white-space: pre-wrap;
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+        padding: 16px;
+        border-radius: 12px;
+      }
+      .success {
+        color: #047857;
+      }
+      .failure {
+        color: #b91c1c;
+      }
+      .note {
+        color: #374151;
+        font-size: 0.95rem;
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="card">
+        <h1>DB Connection Tester</h1>
+        <p class="note">
+          Enter a connection string and choose a database type. The app also
+          detects <code>DB_URL</code> from environment automatically.
+        </p>
+        <label for="dbType">Database type</label>
+        <select id="dbType">
+          <option value="">Auto-detect from connection string</option>
+        </select>
+        <label for="connectionString">Connection string</label>
+        <textarea
+          id="connectionString"
+          rows="3"
+          placeholder="postgres://user:pass@localhost:5432/dbname"
+        ></textarea>
+        <button id="testButton">Test connection</button>
+        <div id="result" class="output"></div>
+      </div>
+      <div class="card">
+        <h2>Environment status</h2>
+        <p class="note">
+          This checks the configured <code>DB_URL</code> /
+          <code>DB_TYPE</code> values from the server environment.
+        </p>
+        <button id="statusButton">Check env DB status</button>
+        <div id="statusResult" class="output"></div>
+      </div>
+    </div>
+    <script>
+      const resultEl = document.getElementById("result");
+      const statusEl = document.getElementById("statusResult");
+      const testButton = document.getElementById("testButton");
+      const statusButton = document.getElementById("statusButton");
+
+      testButton.addEventListener("click", async () => {
+        resultEl.textContent = "Testing...";
+        const connectionString = document
+          .getElementById("connectionString")
+          .value.trim();
+        const dbType = document.getElementById("dbType").value;
+
+        if (!connectionString) {
+          resultEl.innerHTML =
+            '<span class="failure">Enter a connection string before testing.</span>';
+          return;
+        }
+
+        try {
+          const response = await fetch("/api/test-connection", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ connectionString, dbType }),
+          });
+          const payload = await response.json();
+          if (payload.ok) {
+            resultEl.innerHTML = `<span class="success">${payload.message}</span>\n\n${JSON.stringify(payload.details, null, 2)}`;
+          } else {
+            resultEl.innerHTML = `<span class="failure">${payload.message}</span>\n\n${payload.error}`;
+          }
+        } catch (error) {
+          resultEl.innerHTML = `<span class="failure">Request failed</span>\n\n${error.message}`;
+        }
+      });
+
+      statusButton.addEventListener("click", async () => {
+        statusEl.textContent = "Checking environment status...";
+        try {
+          const response = await fetch("/api/status");
+          const payload = await response.json();
+          if (!payload.configured) {
+            statusEl.innerHTML = `<span class="failure">${payload.message}</span>`;
+            return;
+          }
+          if (payload.ok) {
+            statusEl.innerHTML = `<span class="success">${payload.message}</span>\n\n${JSON.stringify(payload.details, null, 2)}`;
+          } else {
+            statusEl.innerHTML = `<span class="failure">${payload.message}</span>\n\n${payload.error}`;
+          }
+        } catch (error) {
+          statusEl.innerHTML = `<span class="failure">Request failed</span>\n\n${error.message}`;
+        }
+      });
+
+      async function loadSupportedTypes() {
+        try {
+          const response = await fetch("/api/supported");
+          const payload = await response.json();
+          const select = document.getElementById("dbType");
+          payload.supported.forEach((type) => {
+            const option = document.createElement("option");
+            option.value = type;
+            option.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+            select.appendChild(option);
+          });
+        } catch (error) {
+          console.warn("Could not load supported DB types", error);
+        }
+      }
+
+      loadSupportedTypes();
+    </script>
+  </body>
+</html>
