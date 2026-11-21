@@ -71,6 +71,73 @@
         font-size: 0.95rem;
         margin-top: 8px;
       }
+      .row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .row > input {
+        flex: 1;
+      }
+      .row > button {
+        width: auto;
+        margin-top: 0;
+        white-space: nowrap;
+      }
+      .actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 12px;
+      }
+      .actions > button {
+        margin-top: 0;
+      }
+      button.secondary {
+        background: #e5e7eb;
+        color: #111827;
+      }
+      button.secondary:hover {
+        background: #d1d5db;
+      }
+      button.danger {
+        background: #dc2626;
+      }
+      button.danger:hover {
+        background: #b91c1c;
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: wait;
+      }
+      .items {
+        list-style: none;
+        padding: 0;
+        margin: 16px 0 0;
+      }
+      .items li {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        padding: 10px 0;
+        border-top: 1px solid #e5e7eb;
+      }
+      .items .value {
+        flex: 1;
+        overflow-wrap: anywhere;
+      }
+      .items .meta {
+        color: #6b7280;
+        font-size: 0.85rem;
+      }
+      .items button {
+        width: auto;
+        margin-top: 0;
+        padding: 6px 12px;
+        font-size: 0.9rem;
+      }
+      .items .empty {
+        color: #6b7280;
+      }
     </style>
   </head>
   <body>
@@ -93,6 +160,31 @@
         ></textarea>
         <button id="testButton">Test connection</button>
         <div id="result" class="output"></div>
+      </div>
+      <div class="card">
+        <h2>Playground</h2>
+        <p class="note">
+          Check that writes work, using the connection above. Items are stored
+          only in the app's own <code>dbtester_items</code> table / collection
+          (Redis: <code>dbtester:*</code> keys), created on the first add.
+        </p>
+        <form id="addForm" class="row" style="margin-top: 16px">
+          <input
+            id="itemValue"
+            type="text"
+            maxlength="1000"
+            placeholder="Something to write, e.g. hello"
+          />
+          <button type="submit" id="addButton">Add</button>
+        </form>
+        <div class="actions">
+          <button id="refreshButton" class="secondary">Refresh</button>
+          <button id="dropButton" class="danger">
+            Remove playground table
+          </button>
+        </div>
+        <div id="playgroundResult" class="output"></div>
+        <ul id="itemList" class="items"></ul>
       </div>
       <div class="card">
         <h2>Environment status</h2>
@@ -174,6 +266,148 @@
           console.warn("Could not load supported DB types", error);
         }
       }
+
+      // --- Playground ---------------------------------------------------
+      const playgroundEl = document.getElementById("playgroundResult");
+      const itemListEl = document.getElementById("itemList");
+      const itemValueEl = document.getElementById("itemValue");
+      const playgroundButtons = [
+        document.getElementById("addButton"),
+        document.getElementById("refreshButton"),
+        document.getElementById("dropButton"),
+      ];
+
+      function showPlayground(ok, message) {
+        playgroundEl.textContent = "";
+        const span = document.createElement("span");
+        span.className = ok ? "success" : "failure";
+        span.textContent = message;
+        playgroundEl.appendChild(span);
+      }
+
+      async function itemsRequest(op, extra = {}) {
+        const connectionString = document
+          .getElementById("connectionString")
+          .value.trim();
+        const dbType = document.getElementById("dbType").value;
+        if (!connectionString) {
+          showPlayground(false, "Enter a connection string above first.");
+          return null;
+        }
+        playgroundButtons.forEach((b) => (b.disabled = true));
+        playgroundEl.textContent = "Working...";
+        try {
+          const response = await fetch(`/api/items/${op}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ connectionString, dbType, ...extra }),
+          });
+          const isJson = (response.headers.get("content-type") || "").includes(
+            "application/json",
+          );
+          if (!isJson) {
+            showPlayground(
+              false,
+              `Server answered HTTP ${response.status} without JSON. If you just updated the app, restart the server (Ctrl+C, then npm start).`,
+            );
+            return null;
+          }
+          const payload = await response.json();
+          if (!payload.ok) {
+            showPlayground(false, payload.error);
+            return null;
+          }
+          return payload;
+        } catch (error) {
+          showPlayground(false, `Request failed: ${error.message}`);
+          return null;
+        } finally {
+          playgroundButtons.forEach((b) => (b.disabled = false));
+        }
+      }
+
+      function renderItems(items) {
+        itemListEl.textContent = "";
+        if (items.length === 0) {
+          const li = document.createElement("li");
+          li.className = "empty";
+          li.textContent = "No items yet.";
+          itemListEl.appendChild(li);
+          return;
+        }
+        items.forEach((item) => {
+          const li = document.createElement("li");
+          const text = document.createElement("div");
+          text.className = "value";
+          text.textContent = item.value;
+          const meta = document.createElement("div");
+          meta.className = "meta";
+          meta.textContent = `#${item.id} · ${new Date(item.created_at).toLocaleString()}`;
+          text.appendChild(meta);
+          const del = document.createElement("button");
+          del.className = "danger";
+          del.textContent = "Delete";
+          del.addEventListener("click", () => deleteItem(item.id));
+          li.append(text, del);
+          itemListEl.appendChild(li);
+        });
+      }
+
+      async function refreshItems(message) {
+        const payload = await itemsRequest("list");
+        if (!payload) return;
+        renderItems(payload.items);
+        showPlayground(
+          true,
+          message || `Read ${payload.items.length} item(s) from ${payload.type}.`,
+        );
+      }
+
+      async function deleteItem(id) {
+        const payload = await itemsRequest("delete", { id });
+        if (!payload) return;
+        await refreshItems(
+          payload.deleted
+            ? `Deleted item #${id}.`
+            : `Item #${id} was already gone.`,
+        );
+      }
+
+      document
+        .getElementById("addForm")
+        .addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const value = itemValueEl.value;
+          if (!value.trim()) {
+            showPlayground(false, "Type something to add.");
+            return;
+          }
+          const payload = await itemsRequest("add", { value });
+          if (!payload) return;
+          itemValueEl.value = "";
+          await refreshItems(
+            `Wrote item #${payload.item.id} and read it back from ${payload.type}.`,
+          );
+        });
+
+      document
+        .getElementById("refreshButton")
+        .addEventListener("click", () => refreshItems());
+
+      document
+        .getElementById("dropButton")
+        .addEventListener("click", async () => {
+          if (
+            !confirm(
+              "Remove the playground table and all its items? Nothing else in the database is touched.",
+            )
+          )
+            return;
+          const payload = await itemsRequest("drop");
+          if (!payload) return;
+          renderItems([]);
+          showPlayground(true, "Playground storage removed.");
+        });
 
       loadSupportedTypes();
     </script>
