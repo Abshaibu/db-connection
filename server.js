@@ -4,6 +4,7 @@ const { Client } = require("pg");
 const mysql = require("mysql2/promise");
 const { MongoClient } = require("mongodb");
 const { createClient: createRedisClient } = require("redis");
+const { runItemOp, OPERATIONS } = require("./playground");
 
 dotenv.config();
 
@@ -149,6 +150,35 @@ app.post("/api/test-connection", async (req, res) => {
     res
       .status(500)
       .json({ ok: false, message: "Connection failed", error: error.message });
+  }
+});
+
+// Playground: add / list / delete items in the app's own scratch storage,
+// to check that the database accepts writes. Credentials travel only in
+// the POST body, and are not echoed back.
+app.post("/api/items/:op", async (req, res) => {
+  const { op } = req.params;
+  const label = OPERATIONS[op];
+  if (!label) {
+    return res
+      .status(404)
+      .json({ ok: false, error: `Unknown operation: ${op}` });
+  }
+
+  const { connectionString, dbType, value, id } = req.body || {};
+  try {
+    if (!connectionString) {
+      const error = new Error("Connection string is required");
+      error.status = 400;
+      throw error;
+    }
+    const type = normalizeType(dbType, connectionString);
+    const result = await runItemOp(type, connectionString, op, { value, id });
+    res.json({ ok: true, type, ...result });
+  } catch (error) {
+    res
+      .status(error.status || 500)
+      .json({ ok: false, error: `${label} failed: ${error.message}` });
   }
 });
 

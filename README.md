@@ -8,6 +8,10 @@ A tiny Node.js Express app to test database connections from the browser.
 - Check a configured environment `DB_URL` and `DB_TYPE`
 - Supports PostgreSQL, MySQL, MongoDB, and Redis
 - Auto-detects database type from common URI schemes
+- Playground: add, list and delete items to check that writes work. Items
+  live only in the app's own `dbtester_items` table / collection (Redis:
+  `dbtester:items` and `dbtester:nextid` keys), created on the first add and
+  removable with one button. Nothing else in the database is touched.
 
 ## Setup
 
